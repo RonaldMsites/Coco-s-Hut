@@ -1,0 +1,6 @@
+{
+  "name": "Coco's Hut",
+  "description": "An all-inclusive e-commerce platform for tech, gadgets, furniture, and trending goods with personalized recommendations, secure checkout, real-time order tracking, and extensive admin capabilities.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
