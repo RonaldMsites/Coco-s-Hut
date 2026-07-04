@@ -1,3 +1,4 @@
+import React from "react";
 import { Link, useNavigate } from 'react-router-dom';
 import { ShoppingCart, Search, User, Package, Menu, Shield, LogIn, LogOut, Heart } from 'lucide-react';
 import { useState } from 'react';

@@ -1,3 +1,4 @@
+import React from "react";
 import { useEffect, useState } from 'react';
 import { useStore } from '../store';
 import { Order, Product } from '../types';

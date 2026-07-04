@@ -1,7 +1,10 @@
+import React from "react";
 import { useState } from 'react';
 import { useStore } from '../store';
 import { X } from 'lucide-react';
 import { t } from '../i18n';
+import { auth } from '../lib/firebase';
+import { createUserWithEmailAndPassword, signInWithEmailAndPassword, updateProfile } from 'firebase/auth';
 
 export default function AuthModal() {
   const { isAuthModalOpen, setAuthModalOpen, setUserEmail, setUserName, language, pendingWishlistId, setPendingWishlistId, addToWishlist } = useStore();
@@ -19,29 +22,25 @@ export default function AuthModal() {
     setError('');
     setLoading(true);
 
-    const endpoint = isLogin ? '/api/auth/login' : '/api/auth/register';
-    
     try {
-      const res = await fetch(endpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(isLogin ? { email, password } : { name, email, password })
-      });
-      const data = await res.json();
-      
-      if (data.success) {
-        setUserEmail(data.email);
-        setUserName(data.name || email.split('@')[0]);
-        setAuthModalOpen(false);
-        if (pendingWishlistId) {
-          addToWishlist(data.email, pendingWishlistId);
-          setPendingWishlistId(null);
-        }
+      if (isLogin) {
+        const userCredential = await signInWithEmailAndPassword(auth, email, password);
+        setUserEmail(userCredential.user.email || '');
+        setUserName(userCredential.user.displayName || email.split('@')[0]);
       } else {
-        setError(data.error || 'Something went wrong');
+        const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+        await updateProfile(userCredential.user, { displayName: name });
+        setUserEmail(userCredential.user.email || '');
+        setUserName(name || email.split('@')[0]);
       }
-    } catch (err) {
-      setError('Network error');
+      
+      setAuthModalOpen(false);
+      if (pendingWishlistId) {
+        addToWishlist(email, pendingWishlistId);
+        setPendingWishlistId(null);
+      }
+    } catch (err: any) {
+      setError(err.message || 'Authentication error');
     } finally {
       setLoading(false);
     }

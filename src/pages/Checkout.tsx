@@ -1,3 +1,4 @@
+import React from "react";
 import { useState } from 'react';
 import { useStore } from '../store';
 import { useNavigate } from 'react-router-dom';
