@@ -5,7 +5,7 @@ import { useStore } from '../store';
 import { ArrowRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { t } from '../i18n';
-import bannerImg from '../assets/banner.jpg';
+import heroImg from '../assets/hero-image.jpg';
 
 export default function Home() {
   const [featured, setFeatured] = useState<Product[]>([]);
@@ -42,7 +42,7 @@ export default function Home() {
       <section className="relative h-[80vh] flex items-center justify-center overflow-hidden">
         <div className="absolute inset-0 z-0">
           <img 
-            src={bannerImg} 
+            src={heroImg} 
             alt="Hero" 
             className="w-full h-full object-cover"
           />
