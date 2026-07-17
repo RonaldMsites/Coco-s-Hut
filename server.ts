@@ -84,7 +84,7 @@ async function startServer() {
   const app = express();
   const PORT = 3000;
 
-  app.use(express.json({ limit: '50mb' }));
+  app.use(express.json({ limit: '50mb' })); // Increased limit for image/video uploads
 
   // === AUTH ROUTES ===
   app.post('/api/auth/register', (req, res) => {
