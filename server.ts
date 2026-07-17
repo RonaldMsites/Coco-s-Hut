@@ -277,6 +277,34 @@ async function startServer() {
     }
   });
 
+  // === OTP ROUTES ===
+  const otps: Record<string, string> = {};
+
+  app.post('/api/auth/send-otp', (req, res) => {
+    const { email } = req.body;
+    if (!email) return res.status(400).json({ error: 'Email is required' });
+    
+    const code = Math.floor(100000 + Math.random() * 900000).toString();
+    otps[email] = code;
+    
+    // In a real app, send via SendGrid/AWS SES/Nodemailer here
+    console.log(`[Mock Email] Sent OTP ${code} to ${email}`);
+    
+    res.json({ success: true, message: 'OTP sent successfully', mockOtp: code });
+  });
+
+  app.post('/api/auth/verify-otp', (req, res) => {
+    const { email, code } = req.body;
+    if (!email || !code) return res.status(400).json({ error: 'Email and code are required' });
+    
+    if (otps[email] === code) {
+      delete otps[email];
+      res.json({ success: true });
+    } else {
+      res.status(400).json({ error: 'Invalid or expired OTP' });
+    }
+  });
+
   // === VITE MIDDLEWARE ===
   if (process.env.NODE_ENV !== 'production') {
     const vite = await createViteServer({
