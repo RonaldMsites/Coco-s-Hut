@@ -27,6 +27,10 @@ function ProductEditorModal({ product, onClose, onSave }: { product?: Product | 
         return;
       }
       Array.from(files).forEach(file => {
+        if (file.size > 2 * 1024 * 1024) {
+          alert(`File ${file.name} is too large (max 2MB)`);
+          return;
+        }
         const reader = new FileReader();
         reader.onloadend = () => {
           setImages(prev => {
@@ -44,6 +48,10 @@ function ProductEditorModal({ product, onClose, onSave }: { product?: Product | 
   const handleVideoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      if (file.size > 3 * 1024 * 1024) {
+        alert(`Video ${file.name} is too large (max 3MB for Vercel demo)`);
+        return;
+      }
       const reader = new FileReader();
       reader.onloadend = () => {
         setVideo(reader.result as string);
@@ -85,12 +93,12 @@ function ProductEditorModal({ product, onClose, onSave }: { product?: Product | 
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center bg-gray-900/50 backdrop-blur-sm p-4 overflow-y-auto">
-      <div className="bg-white rounded-3xl w-full max-w-2xl overflow-hidden relative shadow-2xl my-8">
-        <button onClick={onClose} className="absolute top-4 right-4 p-2 text-gray-400 hover:text-gray-900 transition-colors">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/50 backdrop-blur-sm p-4">
+      <div className="bg-white rounded-3xl w-full max-w-2xl max-h-[90vh] flex flex-col relative shadow-2xl">
+        <button onClick={onClose} className="absolute top-4 right-4 p-2 text-gray-400 hover:text-gray-900 transition-colors z-10 bg-white rounded-full">
           <X className="w-5 h-5" />
         </button>
-        <div className="p-8">
+        <div className="p-8 overflow-y-auto flex-1">
           <h2 className="text-2xl font-bold mb-6">{product ? 'Edit Product' : 'Add New Product'}</h2>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
@@ -204,31 +212,36 @@ export default function AdminDashboard() {
     }
   };
 
-  const handleSaveProduct = (productData: Partial<Product>) => {
-    if (editingProduct) {
-      fetch(`/api/products/${editingProduct.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(productData)
-      }).then(() => {
+  const handleSaveProduct = async (productData: Partial<Product>) => {
+    try {
+      if (editingProduct) {
+        const res = await fetch(`/api/products/${editingProduct.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(productData)
+        });
+        if (!res.ok) throw new Error(await res.text());
         setEditingProduct(null);
         fetchProducts();
-      });
-    } else {
-      fetch('/api/products', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...productData,
-          variants: [{ color: 'Default', size: 'One Size', sku: 'NEW', inventory: 100 }],
-          isBestSeller: false,
-          isFeatured: false,
-          isTrending: false
-        })
-      }).then(() => {
+      } else {
+        const res = await fetch('/api/products', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            ...productData,
+            variants: [{ color: 'Default', size: 'One Size', sku: 'NEW', inventory: 100 }],
+            isBestSeller: false,
+            isFeatured: false,
+            isTrending: false
+          })
+        });
+        if (!res.ok) throw new Error(await res.text());
         setIsAddingProduct(false);
         fetchProducts();
-      });
+      }
+    } catch (err: any) {
+      console.error(err);
+      alert("Failed to save product. Ensure the files are not too large. Error: " + err.message);
     }
   };
 
