@@ -9,6 +9,7 @@ function ProductEditorModal({ product, onClose, onSave }: { product?: Product | 
   const [formData, setFormData] = useState({
     title: product?.title || '',
     price: product?.price || 0,
+    category: product?.category || 'Electronics',
     discountPrice: product?.discountPrice || '',
     shippingCost: product?.shippingCost || '',
     image: product?.images?.[0] || '',
@@ -16,11 +17,25 @@ function ProductEditorModal({ product, onClose, onSave }: { product?: Product | 
     descriptionEn: product?.descriptions?.en || '',
   });
 
+  const CATEGORIES = [
+    "Electronics",
+    "Home & Furniture",
+    "Clothing (Men's wear)",
+    "Clothing (Women's wear)",
+    "Jewelry",
+    "Beauty & Personal Care",
+    "Sports & Outdoors",
+    "Toys & Games",
+    "Groceries",
+    "Other"
+  ];
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     onSave({
       title: formData.title,
       price: Number(formData.price),
+      category: formData.category,
       discountPrice: formData.discountPrice ? Number(formData.discountPrice) : undefined,
       shippingCost: formData.shippingCost ? Number(formData.shippingCost) : undefined,
       images: [formData.image],
@@ -42,6 +57,12 @@ function ProductEditorModal({ product, onClose, onSave }: { product?: Product | 
               <div className="col-span-2">
                 <label className="block text-sm font-medium mb-1">Title</label>
                 <input required value={formData.title} onChange={e => setFormData({...formData, title: e.target.value})} className="w-full border-gray-300 rounded-lg p-2 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-indigo-500 outline-none" />
+              </div>
+              <div className="col-span-2">
+                <label className="block text-sm font-medium mb-1">Category</label>
+                <select required value={formData.category} onChange={e => setFormData({...formData, category: e.target.value})} className="w-full border-gray-300 rounded-lg p-2 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-indigo-500 outline-none">
+                  {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
               </div>
               <div>
                 <label className="block text-sm font-medium mb-1">Price ($)</label>

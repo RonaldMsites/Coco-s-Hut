@@ -42,21 +42,24 @@ export default function Navbar() {
             </form>
           </div>
 
-          <div className="flex items-center space-x-6">
+          <div className="flex items-center space-x-4 sm:space-x-6">
             {isAdmin && (
-              <div className="hidden sm:flex items-center space-x-2 bg-gray-50 rounded-full p-1 border border-gray-200">
+              <div className="flex items-center space-x-1 sm:space-x-2 bg-gray-50 rounded-full p-1 border border-gray-200">
                 <button 
                   onClick={() => setRole('buyer')}
-                  className={`px-3 py-1 text-sm font-medium rounded-full transition-colors ${role === 'buyer' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500'}`}
+                  className={`px-2 sm:px-3 py-1 text-sm font-medium rounded-full flex items-center transition-colors ${role === 'buyer' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500'}`}
+                  title={t(language, 'buyerView') || 'Buyer View'}
                 >
-                  {t(language, 'buyerView')}
+                  <User className="w-4 h-4 sm:hidden" />
+                  <span className="hidden sm:inline">{t(language, 'buyerView')}</span>
                 </button>
                 <button 
                   onClick={() => setRole('admin')}
-                  className={`px-3 py-1 text-sm font-medium rounded-full flex items-center space-x-1 transition-colors ${role === 'admin' ? 'bg-white shadow-sm text-indigo-600' : 'text-gray-500'}`}
+                  className={`px-2 sm:px-3 py-1 text-sm font-medium rounded-full flex items-center space-x-1 transition-colors ${role === 'admin' ? 'bg-white shadow-sm text-indigo-600' : 'text-gray-500'}`}
+                  title={t(language, 'adminView') || 'Admin View'}
                 >
-                  <Shield className="w-3 h-3" />
-                  <span>{t(language, 'adminView')}</span>
+                  <Shield className="w-4 h-4 sm:w-3 sm:h-3" />
+                  <span className="hidden sm:inline">{t(language, 'adminView')}</span>
                 </button>
               </div>
             )}

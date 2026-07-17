@@ -23,6 +23,7 @@ export interface Product {
   images: string[];
   video?: string;
   variants: Variant[];
+  category: string;
   seoKeywords: string[];
   isBestSeller: boolean;
   isFeatured: boolean;

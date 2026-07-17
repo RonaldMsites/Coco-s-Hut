@@ -143,6 +143,9 @@ export default function ProductDetails() {
 
         {/* Info */}
         <div className="flex flex-col">
+          {product.category && (
+            <span className="text-sm font-medium text-indigo-600 mb-2">{product.category}</span>
+          )}
           <h1 className="text-4xl font-bold tracking-tight text-gray-900 sm:text-5xl mb-4">{product.title}</h1>
           <div className="text-2xl font-medium text-gray-900 mb-6">${product.price.toFixed(2)}</div>
           

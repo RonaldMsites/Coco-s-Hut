@@ -15,6 +15,7 @@ const initialProducts: Product[] = [
     },
     price: 299.99,
     images: ['https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=800&q=80'],
+    category: 'Electronics',
     seoKeywords: ['headphones', 'wireless', 'audio', 'premium', 'noise cancellation', 'music', 'bluetooth', 'over-ear', 'bass', 'electronics'],
     isBestSeller: true,
     isFeatured: true,
@@ -38,6 +39,7 @@ const initialProducts: Product[] = [
     },
     price: 199.50,
     images: ['https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=800&q=80'],
+    category: 'Electronics',
     seoKeywords: ['smartwatch', 'wearable', 'fitness tracker', 'minimalist', 'watch', 'health', 'tech', 'accessories', 'bluetooth', 'series x'],
     isBestSeller: false,
     isFeatured: true,
@@ -58,6 +60,7 @@ const initialProducts: Product[] = [
     },
     price: 65.00,
     images: ['https://images.unsplash.com/photo-1592432678016-e910b452f9a2?w=800&q=80'],
+    category: 'Sports & Outdoors',
     seoKeywords: ['yoga mat', 'fitness', 'eco-friendly', 'exercise', 'workout', 'wellness', 'health', 'home gym', 'natural', 'accessories'],
     isBestSeller: true,
     isFeatured: false,
@@ -108,12 +111,15 @@ async function startServer() {
   // 1. Get all products (with search/filters)
   app.get('/api/products', (req, res) => {
     let result = [...products];
-    const { q, featured, trending, bestSeller, ids } = req.query;
+    const { q, featured, trending, bestSeller, ids, category } = req.query;
 
     if (ids && typeof ids === 'string') {
       const idsArray = ids.split(',');
       result = result.filter(p => idsArray.includes(p.id));
     } else {
+      if (category && typeof category === 'string') {
+        result = result.filter(p => p.category === category);
+      }
       if (q) {
         const query = (q as string).toLowerCase();
         result = result.filter(p => 

@@ -56,6 +56,9 @@ export default function ProductCard({ product }: Props) {
         </div>
       </div>
       <div>
+        {product.category && (
+          <p className="text-xs font-medium text-indigo-600 mb-1">{product.category}</p>
+        )}
         <div className="flex justify-between items-start gap-2">
           <h3 className="font-medium text-gray-900 line-clamp-1">{product.title}</h3>
           <span className="font-medium text-gray-900">${product.price.toFixed(2)}</span>

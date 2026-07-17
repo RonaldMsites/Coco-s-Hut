@@ -6,28 +6,70 @@ import { useStore } from '../store';
 import { t } from '../i18n';
 
 export default function Search() {
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const query = searchParams.get('q') || '';
+  const category = searchParams.get('category') || '';
   const [results, setResults] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const { language } = useStore();
 
+  const CATEGORIES = [
+    "Electronics",
+    "Home & Furniture",
+    "Clothing (Men's wear)",
+    "Clothing (Women's wear)",
+    "Jewelry",
+    "Beauty & Personal Care",
+    "Sports & Outdoors",
+    "Toys & Games",
+    "Groceries",
+    "Other"
+  ];
+
   useEffect(() => {
     setLoading(true);
-    fetch(`/api/products?q=${encodeURIComponent(query)}`)
+    let url = `/api/products?q=${encodeURIComponent(query)}`;
+    if (category) url += `&category=${encodeURIComponent(category)}`;
+    fetch(url)
       .then(res => res.json())
       .then(data => {
         setResults(data);
         setLoading(false);
       });
-  }, [query]);
+  }, [query, category]);
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
       <h1 className="text-3xl font-bold tracking-tight text-gray-900 mb-2">
-        {query ? `${t(language, 'searchResults')} "${query}"` : t(language, 'allProducts')}
+        {query ? `${t(language, 'searchResults')} "${query}"` : category ? category : t(language, 'allProducts')}
       </h1>
-      <p className="text-gray-500 mb-10">{results.length} {t(language, 'productsFound')}</p>
+      <p className="text-gray-500 mb-6">{results.length} {t(language, 'productsFound')}</p>
+
+      <div className="flex flex-wrap gap-2 mb-10">
+        <button
+          onClick={() => {
+            const params = new URLSearchParams(searchParams);
+            params.delete('category');
+            setSearchParams(params);
+          }}
+          className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${!category ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
+        >
+          All
+        </button>
+        {CATEGORIES.map(c => (
+          <button
+            key={c}
+            onClick={() => {
+              const params = new URLSearchParams(searchParams);
+              params.set('category', c);
+              setSearchParams(params);
+            }}
+            className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${category === c ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
+          >
+            {c}
+          </button>
+        ))}
+      </div>
 
       {loading ? (
         <div className="flex justify-center py-20">
