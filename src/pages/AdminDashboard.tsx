@@ -2,8 +2,10 @@ import React from "react";
 import { useEffect, useState } from 'react';
 import { useStore } from '../store';
 import { Order, Product } from '../types';
-import { Package, Truck, ExternalLink, Edit2, Trash2, Plus, X } from 'lucide-react';
+import { Package, Truck, ExternalLink, Edit2, Trash2, Plus, X, Loader2 } from 'lucide-react';
 import { Link, Navigate } from 'react-router-dom';
+import { storage } from '../lib/firebase';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 
 function ProductEditorModal({ product, onClose, onSave }: { product?: Product | null, onClose: () => void, onSave: (p: Partial<Product>) => void }) {
   const [formData, setFormData] = useState({
@@ -16,8 +18,9 @@ function ProductEditorModal({ product, onClose, onSave }: { product?: Product | 
     descriptionEn: product?.descriptions?.en || '',
   });
 
-  const [images, setImages] = useState<string[]>(product?.images || []);
-  const [video, setVideo] = useState<string>(product?.video || '');
+  const [images, setImages] = useState<(string | File)[]>(product?.images || []);
+  const [video, setVideo] = useState<string | File | null>(product?.video || null);
+  const [isUploading, setIsUploading] = useState(false);
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -26,21 +29,16 @@ function ProductEditorModal({ product, onClose, onSave }: { product?: Product | 
         alert("You can only upload up to 5 images.");
         return;
       }
-      Array.from(files).forEach(file => {
-        if (file.size > 2 * 1024 * 1024) {
-          alert(`File ${file.name} is too large (max 2MB)`);
-          return;
+      const newFiles = Array.from(files).filter(file => {
+        if (file.size > 5 * 1024 * 1024) {
+          alert(`File ${file.name} is too large (max 5MB)`);
+          return false;
         }
-        const reader = new FileReader();
-        reader.onloadend = () => {
-          setImages(prev => {
-            if (prev.length < 5) {
-              return [...prev, reader.result as string];
-            }
-            return prev;
-          });
-        };
-        reader.readAsDataURL(file);
+        return true;
+      });
+      setImages(prev => {
+        const combined = [...prev, ...newFiles];
+        return combined.slice(0, 5);
       });
     }
   };
@@ -48,15 +46,11 @@ function ProductEditorModal({ product, onClose, onSave }: { product?: Product | 
   const handleVideoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      if (file.size > 3 * 1024 * 1024) {
-        alert(`Video ${file.name} is too large (max 3MB for Vercel demo)`);
+      if (file.size > 15 * 1024 * 1024) {
+        alert(`Video ${file.name} is too large (max 15MB)`);
         return;
       }
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setVideo(reader.result as string);
-      };
-      reader.readAsDataURL(file);
+      setVideo(file);
     }
   };
 
@@ -73,23 +67,50 @@ function ProductEditorModal({ product, onClose, onSave }: { product?: Product | 
     "Other"
   ];
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (images.length === 0) {
       alert("Please upload at least one image.");
       return;
     }
-    onSave({
-      title: formData.title,
-      price: Number(formData.price),
-      category: formData.category,
-      discountPrice: formData.discountPrice ? Number(formData.discountPrice) : undefined,
-      shippingCost: formData.shippingCost ? Number(formData.shippingCost) : undefined,
-      images: images,
-      video: video || undefined,
-      seoKeywords: formData.seoKeywords.split(',').map(s => s.trim()).filter(Boolean),
-      descriptions: { ...product?.descriptions, en: formData.descriptionEn }
-    });
+    
+    setIsUploading(true);
+    try {
+      // 1. Upload new images to Firebase Storage
+      const uploadedImageUrls = await Promise.all(
+        images.map(async (item) => {
+          if (typeof item === 'string') return item; // already a URL
+          const fileRef = ref(storage, `products/${Date.now()}_${item.name}`);
+          await uploadBytes(fileRef, item);
+          return await getDownloadURL(fileRef);
+        })
+      );
+
+      // 2. Upload video if it's a new file
+      let uploadedVideoUrl = typeof video === 'string' ? video : undefined;
+      if (video instanceof File) {
+        const videoRef = ref(storage, `products/videos/${Date.now()}_${video.name}`);
+        await uploadBytes(videoRef, video);
+        uploadedVideoUrl = await getDownloadURL(videoRef);
+      }
+
+      onSave({
+        title: formData.title,
+        price: Number(formData.price),
+        category: formData.category,
+        discountPrice: formData.discountPrice ? Number(formData.discountPrice) : undefined,
+        shippingCost: formData.shippingCost ? Number(formData.shippingCost) : undefined,
+        images: uploadedImageUrls,
+        video: uploadedVideoUrl,
+        seoKeywords: formData.seoKeywords.split(',').map(s => s.trim()).filter(Boolean),
+        descriptions: { ...product?.descriptions, en: formData.descriptionEn }
+      });
+    } catch (err: any) {
+      console.error('Upload failed:', err);
+      alert('Failed to upload files to storage. Error: ' + err.message);
+    } finally {
+      setIsUploading(false);
+    }
   };
 
   return (
@@ -131,7 +152,7 @@ function ProductEditorModal({ product, onClose, onSave }: { product?: Product | 
                   <div className="flex gap-2 mt-2 flex-wrap">
                     {images.map((img, i) => (
                       <div key={i} className="relative w-16 h-16 rounded overflow-hidden">
-                        <img src={img} className="object-cover w-full h-full" />
+                        <img src={typeof img === 'string' ? img : URL.createObjectURL(img)} className="object-cover w-full h-full" />
                         <button type="button" onClick={() => setImages(images.filter((_, idx) => idx !== i))} className="absolute top-0 right-0 bg-red-500 text-white rounded-full p-0.5 m-0.5">
                           <X className="w-3 h-3" />
                         </button>
@@ -145,8 +166,8 @@ function ProductEditorModal({ product, onClose, onSave }: { product?: Product | 
                 <input type="file" accept="video/*" onChange={handleVideoUpload} className="w-full border-gray-300 rounded-lg p-2 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-indigo-500 outline-none" />
                 {video && (
                   <div className="mt-2 relative w-32 h-32 rounded overflow-hidden">
-                    <video src={video} className="object-cover w-full h-full" muted />
-                    <button type="button" onClick={() => setVideo('')} className="absolute top-0 right-0 bg-red-500 text-white rounded-full p-0.5 m-0.5">
+                    <video src={typeof video === 'string' ? video : URL.createObjectURL(video)} className="object-cover w-full h-full" muted />
+                    <button type="button" onClick={() => setVideo(null)} className="absolute top-0 right-0 bg-red-500 text-white rounded-full p-0.5 m-0.5">
                       <X className="w-3 h-3" />
                     </button>
                   </div>
@@ -162,8 +183,11 @@ function ProductEditorModal({ product, onClose, onSave }: { product?: Product | 
               </div>
             </div>
             <div className="pt-4 flex justify-end gap-3">
-              <button type="button" onClick={onClose} className="px-4 py-2 font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200">Cancel</button>
-              <button type="submit" className="px-4 py-2 font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700">Save Product</button>
+              <button type="button" onClick={onClose} disabled={isUploading} className="px-4 py-2 font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 disabled:opacity-50">Cancel</button>
+              <button type="submit" disabled={isUploading} className="flex items-center gap-2 px-4 py-2 font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 disabled:opacity-50">
+                {isUploading && <Loader2 className="w-4 h-4 animate-spin" />}
+                {isUploading ? 'Uploading...' : 'Save Product'}
+              </button>
             </div>
           </form>
         </div>
