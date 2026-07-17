@@ -12,10 +12,45 @@ function ProductEditorModal({ product, onClose, onSave }: { product?: Product | 
     category: product?.category || 'Electronics',
     discountPrice: product?.discountPrice || '',
     shippingCost: product?.shippingCost || '',
-    image: product?.images?.[0] || '',
     seoKeywords: product?.seoKeywords?.join(', ') || '',
     descriptionEn: product?.descriptions?.en || '',
   });
+
+  const [images, setImages] = useState<string[]>(product?.images || []);
+  const [video, setVideo] = useState<string>(product?.video || '');
+
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (files) {
+      if (images.length + files.length > 5) {
+        alert("You can only upload up to 5 images.");
+        return;
+      }
+      Array.from(files).forEach(file => {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          setImages(prev => {
+            if (prev.length < 5) {
+              return [...prev, reader.result as string];
+            }
+            return prev;
+          });
+        };
+        reader.readAsDataURL(file);
+      });
+    }
+  };
+
+  const handleVideoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setVideo(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
 
   const CATEGORIES = [
     "Electronics",
@@ -32,13 +67,18 @@ function ProductEditorModal({ product, onClose, onSave }: { product?: Product | 
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (images.length === 0) {
+      alert("Please upload at least one image.");
+      return;
+    }
     onSave({
       title: formData.title,
       price: Number(formData.price),
       category: formData.category,
       discountPrice: formData.discountPrice ? Number(formData.discountPrice) : undefined,
       shippingCost: formData.shippingCost ? Number(formData.shippingCost) : undefined,
-      images: [formData.image],
+      images: images,
+      video: video || undefined,
       seoKeywords: formData.seoKeywords.split(',').map(s => s.trim()).filter(Boolean),
       descriptions: { ...product?.descriptions, en: formData.descriptionEn }
     });
@@ -77,8 +117,32 @@ function ProductEditorModal({ product, onClose, onSave }: { product?: Product | 
                 <input type="number" step="0.01" value={formData.shippingCost} onChange={e => setFormData({...formData, shippingCost: e.target.value})} className="w-full border-gray-300 rounded-lg p-2 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-indigo-500 outline-none" />
               </div>
               <div className="col-span-2">
-                <label className="block text-sm font-medium mb-1">Image URL</label>
-                <input required value={formData.image} onChange={e => setFormData({...formData, image: e.target.value})} className="w-full border-gray-300 rounded-lg p-2 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-indigo-500 outline-none" />
+                <label className="block text-sm font-medium mb-1">Images (Up to 5)</label>
+                <input type="file" multiple accept="image/*" onChange={handleImageUpload} className="w-full border-gray-300 rounded-lg p-2 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-indigo-500 outline-none" />
+                {images.length > 0 && (
+                  <div className="flex gap-2 mt-2 flex-wrap">
+                    {images.map((img, i) => (
+                      <div key={i} className="relative w-16 h-16 rounded overflow-hidden">
+                        <img src={img} className="object-cover w-full h-full" />
+                        <button type="button" onClick={() => setImages(images.filter((_, idx) => idx !== i))} className="absolute top-0 right-0 bg-red-500 text-white rounded-full p-0.5 m-0.5">
+                          <X className="w-3 h-3" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <div className="col-span-2">
+                <label className="block text-sm font-medium mb-1">Video (Optional)</label>
+                <input type="file" accept="video/*" onChange={handleVideoUpload} className="w-full border-gray-300 rounded-lg p-2 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-indigo-500 outline-none" />
+                {video && (
+                  <div className="mt-2 relative w-32 h-32 rounded overflow-hidden">
+                    <video src={video} className="object-cover w-full h-full" muted />
+                    <button type="button" onClick={() => setVideo('')} className="absolute top-0 right-0 bg-red-500 text-white rounded-full p-0.5 m-0.5">
+                      <X className="w-3 h-3" />
+                    </button>
+                  </div>
+                )}
               </div>
               <div className="col-span-2">
                 <label className="block text-sm font-medium mb-1">SEO Keywords (comma separated)</label>
