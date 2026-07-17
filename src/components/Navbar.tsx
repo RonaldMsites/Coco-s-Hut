@@ -42,30 +42,28 @@ export default function Navbar() {
             </form>
           </div>
 
-          <div className="flex items-center space-x-4 sm:space-x-6">
+          <div className="flex items-center space-x-3 sm:space-x-6">
             {isAdmin && (
               <div className="flex items-center space-x-1 sm:space-x-2 bg-gray-50 rounded-full p-1 border border-gray-200">
                 <button 
                   onClick={() => setRole('buyer')}
-                  className={`px-2 sm:px-3 py-1 text-sm font-medium rounded-full flex items-center transition-colors ${role === 'buyer' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500'}`}
+                  className={`px-2 sm:px-3 py-1 text-xs sm:text-sm font-medium rounded-full flex items-center transition-colors ${role === 'buyer' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500'}`}
                   title={t(language, 'buyerView') || 'Buyer View'}
                 >
-                  <User className="w-4 h-4 sm:hidden" />
-                  <span className="hidden sm:inline">{t(language, 'buyerView')}</span>
+                  <span>{t(language, 'buyerView')}</span>
                 </button>
                 <button 
                   onClick={() => setRole('admin')}
-                  className={`px-2 sm:px-3 py-1 text-sm font-medium rounded-full flex items-center space-x-1 transition-colors ${role === 'admin' ? 'bg-white shadow-sm text-indigo-600' : 'text-gray-500'}`}
+                  className={`px-2 sm:px-3 py-1 text-xs sm:text-sm font-medium rounded-full flex items-center transition-colors ${role === 'admin' ? 'bg-white shadow-sm text-indigo-600' : 'text-gray-500'}`}
                   title={t(language, 'adminView') || 'Admin View'}
                 >
-                  <Shield className="w-4 h-4 sm:w-3 sm:h-3" />
-                  <span className="hidden sm:inline">{t(language, 'adminView')}</span>
+                  <span>{t(language, 'adminView')}</span>
                 </button>
               </div>
             )}
 
             <select 
-              className="text-sm bg-transparent border-none text-gray-600 focus:ring-0 cursor-pointer outline-none"
+              className="text-sm bg-transparent border-none text-gray-600 focus:ring-0 cursor-pointer outline-none hidden sm:block"
               value={language}
               onChange={(e) => setLanguage(e.target.value)}
             >
@@ -79,22 +77,22 @@ export default function Navbar() {
             </select>
 
             {isAdmin && role === 'admin' && (
-              <Link to="/admin" className="text-gray-600 hover:text-gray-900 transition-colors">
+              <Link to="/admin" className="text-gray-600 hover:text-gray-900 transition-colors hidden sm:block">
                 <Package className="w-5 h-5" />
               </Link>
             )}
 
             {userEmail ? (
-              <button onClick={() => { setUserEmail(null); setRole('buyer'); }} className="text-gray-600 hover:text-gray-900 transition-colors" title={t(language, 'logout')}>
-                <LogOut className="w-5 h-5" />
+              <button onClick={() => { setUserEmail(null); setRole('buyer'); }} className="text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors" title={t(language, 'logout')}>
+                Sign out
               </button>
             ) : (
               <button 
                 onClick={() => setAuthModalOpen(true)} 
-                className="text-gray-600 hover:text-gray-900 transition-colors" 
+                className="text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors" 
                 title={t(language, 'login')}
               >
-                <LogIn className="w-5 h-5" />
+                Sign in
               </button>
             )}
 
