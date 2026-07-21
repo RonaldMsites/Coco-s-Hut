@@ -4,8 +4,33 @@ import { useStore } from '../store';
 import { Order, Product } from '../types';
 import { Package, Truck, ExternalLink, Edit2, Trash2, Plus, X, Loader2 } from 'lucide-react';
 import { Link, Navigate } from 'react-router-dom';
-import { storage } from '../lib/firebase';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+
+const uploadToCloudinary = async (fileOrDataUrl: string | File, resourceType: 'image' | 'video' = 'auto'): Promise<string> => {
+  const cloudName = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME;
+  const uploadPreset = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET;
+
+  if (!cloudName || !uploadPreset) {
+    throw new Error("Cloudinary configuration missing. Please add VITE_CLOUDINARY_CLOUD_NAME and VITE_CLOUDINARY_UPLOAD_PRESET in AI Studio Settings -> Environment Variables.");
+  }
+
+  const url = `https://api.cloudinary.com/v1_1/${cloudName}/${resourceType}/upload`;
+  const formData = new FormData();
+  formData.append('file', fileOrDataUrl);
+  formData.append('upload_preset', uploadPreset);
+
+  const response = await fetch(url, {
+    method: 'POST',
+    body: formData
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error?.message || 'Upload failed');
+  }
+
+  const data = await response.json();
+  return data.secure_url;
+};
 
 function ProductEditorModal({ product, onClose, onSave }: { product?: Product | null, onClose: () => void, onSave: (p: Partial<Product>) => void }) {
   const [formData, setFormData] = useState({
@@ -18,39 +43,85 @@ function ProductEditorModal({ product, onClose, onSave }: { product?: Product | 
     descriptionEn: product?.descriptions?.en || '',
   });
 
-  const [images, setImages] = useState<(string | File)[]>(product?.images || []);
-  const [video, setVideo] = useState<string | File | null>(product?.video || null);
+  const compressImage = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = (event) => {
+        const img = new Image();
+        img.src = event.target?.result as string;
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          const MAX_WIDTH = 800;
+          const MAX_HEIGHT = 800;
+          let width = img.width;
+          let height = img.height;
+
+          if (width > height) {
+            if (width > MAX_WIDTH) {
+              height *= MAX_WIDTH / width;
+              width = MAX_WIDTH;
+            }
+          } else {
+            if (height > MAX_HEIGHT) {
+              width *= MAX_HEIGHT / height;
+              height = MAX_HEIGHT;
+            }
+          }
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          ctx?.drawImage(img, 0, 0, width, height);
+          resolve(canvas.toDataURL('image/jpeg', 0.7)); // Compress to 70% quality JPEG
+        };
+        img.onerror = (err) => reject(err);
+      };
+      reader.onerror = (err) => reject(err);
+    });
+  };
+
+  const [images, setImages] = useState<string[]>(product?.images || []);
+  const [video, setVideo] = useState<string>(product?.video || '');
   const [isUploading, setIsUploading] = useState(false);
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (files) {
       if (images.length + files.length > 5) {
         alert("You can only upload up to 5 images.");
         return;
       }
-      const newFiles = Array.from(files).filter(file => {
-        if (file.size > 5 * 1024 * 1024) {
-          alert(`File ${file.name} is too large (max 5MB)`);
-          return false;
-        }
-        return true;
-      });
-      setImages(prev => {
-        const combined = [...prev, ...newFiles];
-        return combined.slice(0, 5);
-      });
+      setIsUploading(true);
+      try {
+        const compressedImages = await Promise.all(
+          Array.from(files).map(async (file) => {
+            if (file.size > 10 * 1024 * 1024) {
+              alert(`File ${file.name} is too large. Please select images under 10MB.`);
+              return null;
+            }
+            return await compressImage(file);
+          })
+        );
+        const validImages = compressedImages.filter(Boolean) as string[];
+        setImages(prev => [...prev, ...validImages].slice(0, 5));
+      } catch (err) {
+        console.error("Image compression failed:", err);
+        alert("Failed to process images.");
+      } finally {
+        setIsUploading(false);
+      }
     }
   };
 
   const handleVideoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      if (file.size > 15 * 1024 * 1024) {
-        alert(`Video ${file.name} is too large (max 15MB)`);
+      if (file.size > 50 * 1024 * 1024) {
+        alert(`Video ${file.name} is too large. Please limit videos to 50MB.`);
         return;
       }
-      setVideo(file);
+      // Store the file directly to upload via FormData, avoids large base64 strings in memory
+      setVideo(file as any);
     }
   };
 
@@ -76,22 +147,19 @@ function ProductEditorModal({ product, onClose, onSave }: { product?: Product | 
     
     setIsUploading(true);
     try {
-      // 1. Upload new images to Firebase Storage
+      // 1. Upload new images to Cloudinary
       const uploadedImageUrls = await Promise.all(
         images.map(async (item) => {
-          if (typeof item === 'string') return item; // already a URL
-          const fileRef = ref(storage, `products/${Date.now()}_${item.name}`);
-          await uploadBytes(fileRef, item);
-          return await getDownloadURL(fileRef);
+          if (typeof item === 'string' && item.startsWith('http')) return item; // already a URL
+          
+          return await uploadToCloudinary(item, 'image');
         })
       );
 
-      // 2. Upload video if it's a new file
-      let uploadedVideoUrl = typeof video === 'string' ? video : undefined;
-      if (video instanceof File) {
-        const videoRef = ref(storage, `products/videos/${Date.now()}_${video.name}`);
-        await uploadBytes(videoRef, video);
-        uploadedVideoUrl = await getDownloadURL(videoRef);
+      // 2. Upload video to Cloudinary if it's a new file
+      let uploadedVideoUrl = typeof video === 'string' && video.startsWith('http') ? video : undefined;
+      if (video && (typeof video !== 'string' || !video.startsWith('http'))) {
+         uploadedVideoUrl = await uploadToCloudinary(video, 'video');
       }
 
       onSave({
@@ -106,8 +174,8 @@ function ProductEditorModal({ product, onClose, onSave }: { product?: Product | 
         descriptions: { ...product?.descriptions, en: formData.descriptionEn }
       });
     } catch (err: any) {
-      console.error('Upload failed:', err);
-      alert('Failed to upload files to storage. Error: ' + err.message);
+      console.error('Upload/Save failed:', err);
+      alert('Failed to upload files. ' + err.message);
     } finally {
       setIsUploading(false);
     }
@@ -152,7 +220,7 @@ function ProductEditorModal({ product, onClose, onSave }: { product?: Product | 
                   <div className="flex gap-2 mt-2 flex-wrap">
                     {images.map((img, i) => (
                       <div key={i} className="relative w-16 h-16 rounded overflow-hidden">
-                        <img src={typeof img === 'string' ? img : URL.createObjectURL(img)} className="object-cover w-full h-full" />
+                        <img src={img} className="object-cover w-full h-full" />
                         <button type="button" onClick={() => setImages(images.filter((_, idx) => idx !== i))} className="absolute top-0 right-0 bg-red-500 text-white rounded-full p-0.5 m-0.5">
                           <X className="w-3 h-3" />
                         </button>
@@ -166,8 +234,8 @@ function ProductEditorModal({ product, onClose, onSave }: { product?: Product | 
                 <input type="file" accept="video/*" onChange={handleVideoUpload} className="w-full border-gray-300 rounded-lg p-2 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-indigo-500 outline-none" />
                 {video && (
                   <div className="mt-2 relative w-32 h-32 rounded overflow-hidden">
-                    <video src={typeof video === 'string' ? video : URL.createObjectURL(video)} className="object-cover w-full h-full" muted />
-                    <button type="button" onClick={() => setVideo(null)} className="absolute top-0 right-0 bg-red-500 text-white rounded-full p-0.5 m-0.5">
+                    <video src={typeof video === 'string' ? video : URL.createObjectURL(video as unknown as File)} className="object-cover w-full h-full" muted />
+                    <button type="button" onClick={() => setVideo('')} className="absolute top-0 right-0 bg-red-500 text-white rounded-full p-0.5 m-0.5">
                       <X className="w-3 h-3" />
                     </button>
                   </div>
