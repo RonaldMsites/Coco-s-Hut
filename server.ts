@@ -80,8 +80,9 @@ let products: Product[] = [...initialProducts];
 let orders: Order[] = [];
 let users: any[] = [];
 
+const app = express();
 async function startServer() {
-  const app = express();
+
   const PORT = 3000;
 
   app.use(express.json({ limit: '50mb' })); // Increased limit for image/video uploads
@@ -326,9 +327,12 @@ async function startServer() {
     });
   }
 
-  app.listen(PORT, '0.0.0.0', () => {
-    console.log(`Server running on port ${PORT}`);
-  });
+  if (!process.env.VERCEL) {
+    app.listen(PORT, '0.0.0.0', () => {
+      console.log(`Server running on port ${PORT}`);
+    });
+  }
 }
 
 startServer();
+export default app;
