@@ -5,34 +5,54 @@ import { Order, Product } from '../types';
 import { Package, Truck, ExternalLink, Edit2, Trash2, Plus, X, Loader2 } from 'lucide-react';
 import { Link, Navigate } from 'react-router-dom';
 
-const uploadToCloudinary = async (fileOrDataUrl: string | File, resourceType: 'image' | 'video' | 'auto' = 'auto'): Promise<string> => {
-  const cloudName = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME;
-  const uploadPreset = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET;
+const uploadToCloudinary = (fileOrDataUrl: string | File, resourceType: 'image' | 'video' | 'auto' = 'auto', onProgress?: (p: number) => void): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const cloudName = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME;
+    const uploadPreset = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET;
 
-  if (!cloudName || !uploadPreset) {
-    throw new Error("Cloudinary configuration missing. Please add VITE_CLOUDINARY_CLOUD_NAME and VITE_CLOUDINARY_UPLOAD_PRESET in AI Studio Settings -> Environment Variables.");
-  }
+    if (!cloudName || !uploadPreset) {
+      return reject(new Error("Cloudinary configuration missing. Please add VITE_CLOUDINARY_CLOUD_NAME and VITE_CLOUDINARY_UPLOAD_PRESET in AI Studio Settings -> Environment Variables."));
+    }
 
-  const url = `https://api.cloudinary.com/v1_1/${cloudName}/${resourceType}/upload`;
-  const formData = new FormData();
-  formData.append('file', fileOrDataUrl);
-  formData.append('upload_preset', uploadPreset);
+    const url = `https://api.cloudinary.com/v1_1/${cloudName}/${resourceType}/upload`;
+    const formData = new FormData();
+    formData.append('file', fileOrDataUrl);
+    formData.append('upload_preset', uploadPreset);
 
-  const response = await fetch(url, {
-    method: 'POST',
-    body: formData
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', url, true);
+
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable && onProgress) {
+        const percent = Math.round((e.loaded / e.total) * 100);
+        onProgress(percent);
+      }
+    };
+
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        try {
+          const response = JSON.parse(xhr.responseText);
+          resolve(response.secure_url);
+        } catch (err) {
+          reject(new Error('Invalid response from Cloudinary'));
+        }
+      } else {
+        try {
+          const error = JSON.parse(xhr.responseText);
+          reject(new Error(error.error?.message || 'Upload failed'));
+        } catch (err) {
+          reject(new Error(`Upload failed with status ${xhr.status}`));
+        }
+      }
+    };
+
+    xhr.onerror = () => reject(new Error('Network error during upload'));
+    xhr.send(formData);
   });
-
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.error?.message || 'Upload failed');
-  }
-
-  const data = await response.json();
-  return data.secure_url;
 };
 
-function ProductEditorModal({ product, onClose, onSave }: { product?: Product | null, onClose: () => void, onSave: (p: Partial<Product>) => void }) {
+function ProductEditorModal({ product, onClose, onSave }: { product?: Product | null, onClose: () => void, onSave: (p: Partial<Product>) => Promise<void> }) {
   const [formData, setFormData] = useState({
     title: product?.title || '',
     price: product?.price || 0,
@@ -83,6 +103,7 @@ function ProductEditorModal({ product, onClose, onSave }: { product?: Product | 
   const [images, setImages] = useState<string[]>(product?.images || []);
   const [video, setVideo] = useState<string>(product?.video || '');
   const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<{status: string, percent: number} | null>(null);
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -109,6 +130,8 @@ function ProductEditorModal({ product, onClose, onSave }: { product?: Product | 
         alert("Failed to process images.");
       } finally {
         setIsUploading(false);
+      setUploadProgress(null);
+      setUploadProgress(null);
       }
     }
   };
@@ -152,17 +175,18 @@ function ProductEditorModal({ product, onClose, onSave }: { product?: Product | 
         images.map(async (item) => {
           if (typeof item === 'string' && item.startsWith('http')) return item; // already a URL
           
-          return await uploadToCloudinary(item, 'image');
+          return await uploadToCloudinary(item, 'image', (p) => setUploadProgress({ status: 'Uploading Images', percent: p }));
         })
       );
 
       // 2. Upload video to Cloudinary if it's a new file
       let uploadedVideoUrl = typeof video === 'string' && video.startsWith('http') ? video : undefined;
       if (video && (typeof video !== 'string' || !video.startsWith('http'))) {
-         uploadedVideoUrl = await uploadToCloudinary(video, 'video');
+         uploadedVideoUrl = await uploadToCloudinary(video, 'video', (p) => setUploadProgress({ status: 'Uploading Video', percent: p }));
       }
 
-      onSave({
+      setUploadProgress({ status: 'Saving Product', percent: 100 });
+      await onSave({
         title: formData.title,
         price: Number(formData.price),
         category: formData.category,
@@ -178,6 +202,7 @@ function ProductEditorModal({ product, onClose, onSave }: { product?: Product | 
       alert('Failed to upload files. ' + err.message);
     } finally {
       setIsUploading(false);
+      setUploadProgress(null);
     }
   };
 
@@ -254,7 +279,7 @@ function ProductEditorModal({ product, onClose, onSave }: { product?: Product | 
               <button type="button" onClick={onClose} disabled={isUploading} className="px-4 py-2 font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 disabled:opacity-50">Cancel</button>
               <button type="submit" disabled={isUploading} className="flex items-center gap-2 px-4 py-2 font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 disabled:opacity-50">
                 {isUploading && <Loader2 className="w-4 h-4 animate-spin" />}
-                {isUploading ? 'Uploading...' : 'Save Product'}
+                {isUploading ? (uploadProgress ? `${uploadProgress.status} (${uploadProgress.percent}%)` : 'Uploading...') : 'Save Product'}
               </button>
             </div>
           </form>
@@ -304,7 +329,7 @@ export default function AdminDashboard() {
     }
   };
 
-  const handleSaveProduct = async (productData: Partial<Product>) => {
+  const handleSaveProduct = async (productData: Partial<Product>): Promise<void> => {
     try {
       if (editingProduct) {
         const res = await fetch(`/api/products/${editingProduct.id}`, {
