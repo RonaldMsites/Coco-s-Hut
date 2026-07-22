@@ -5,7 +5,7 @@ import { Order, Product } from '../types';
 import { Package, Truck, ExternalLink, Edit2, Trash2, Plus, X, Loader2 } from 'lucide-react';
 import { Link, Navigate } from 'react-router-dom';
 
-const uploadToCloudinary = async (fileOrDataUrl: string | File, resourceType: 'image' | 'video' = 'auto'): Promise<string> => {
+const uploadToCloudinary = async (fileOrDataUrl: string | File, resourceType: 'image' | 'video' | 'auto' = 'auto'): Promise<string> => {
   const cloudName = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME;
   const uploadPreset = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET;
 
