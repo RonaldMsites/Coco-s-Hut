@@ -1,4 +1,4 @@
-import app from '../express-app';
+import app from '../express-app.js';
 
 export const config = {
   api: {
