@@ -322,7 +322,7 @@ app.post('/api/auth/verify-otp', (req, res) => {
 export default app;
 
 async function startLocalServer() {
-  const PORT = process.env.PORT || 3000;
+  const PORT = parseInt(process.env.PORT || "3000", 10);
   
   if (process.env.NODE_ENV !== 'production' && !process.env.VERCEL) {
     const { createServer: createViteServer } = await import("vite");
