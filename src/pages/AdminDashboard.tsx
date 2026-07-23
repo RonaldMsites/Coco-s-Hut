@@ -5,52 +5,63 @@ import { Order, Product } from '../types';
 import { Package, Truck, ExternalLink, Edit2, Trash2, Plus, X, Loader2 } from 'lucide-react';
 import { Link, Navigate } from 'react-router-dom';
 
-const uploadToCloudinary = (fileOrDataUrl: string | File, resourceType: 'image' | 'video' | 'auto' = 'auto', onProgress?: (p: number) => void): Promise<string> => {
-  return new Promise((resolve, reject) => {
-    const cloudName = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME;
-    const uploadPreset = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET;
-
-    if (!cloudName || !uploadPreset) {
-      return reject(new Error("Cloudinary configuration missing. Please add VITE_CLOUDINARY_CLOUD_NAME and VITE_CLOUDINARY_UPLOAD_PRESET in AI Studio Settings -> Environment Variables."));
-    }
-
-    const url = `https://api.cloudinary.com/v1_1/${cloudName}/${resourceType}/upload`;
-    const formData = new FormData();
-    formData.append('file', fileOrDataUrl);
-    formData.append('upload_preset', uploadPreset);
-
-    const xhr = new XMLHttpRequest();
-    xhr.open('POST', url, true);
-
-    xhr.upload.onprogress = (e) => {
-      if (e.lengthComputable && onProgress) {
-        const percent = Math.round((e.loaded / e.total) * 100);
-        onProgress(percent);
-      }
-    };
-
-    xhr.onload = () => {
-      if (xhr.status >= 200 && xhr.status < 300) {
-        try {
-          const response = JSON.parse(xhr.responseText);
-          resolve(response.secure_url);
-        } catch (err) {
-          reject(new Error('Invalid response from Cloudinary'));
-        }
-      } else {
-        try {
-          const error = JSON.parse(xhr.responseText);
-          reject(new Error(error.error?.message || 'Upload failed'));
-        } catch (err) {
-          reject(new Error(`Upload failed with status ${xhr.status}`));
-        }
-      }
-    };
-
-    xhr.onerror = () => reject(new Error('Network error during upload'));
-    xhr.send(formData);
-  });
+const dataURLtoBlob = (dataurl: string) => {
+  const arr = dataurl.split(',');
+  const mimeMatch = arr[0].match(/:(.*?);/);
+  const mime = mimeMatch ? mimeMatch[1] : '';
+  const bstr = atob(arr[1]);
+  let n = bstr.length;
+  const u8arr = new Uint8Array(n);
+  while(n--){
+      u8arr[n] = bstr.charCodeAt(n);
+  }
+  return new Blob([u8arr], {type:mime});
 };
+
+const uploadToCloudinary = async (fileOrDataUrl: string | File, resourceType: 'image' | 'video' | 'auto' = 'auto', onProgress?: (p: number) => void): Promise<string> => {
+  const cloudName = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME;
+  const uploadPreset = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET;
+  
+  if (!cloudName || !uploadPreset) {
+    throw new Error("Cloudinary configuration missing. Please add VITE_CLOUDINARY_CLOUD_NAME and VITE_CLOUDINARY_UPLOAD_PRESET in AI Studio Settings -> Environment Variables.");
+  }
+  
+  const url = `https://api.cloudinary.com/v1_1/${cloudName}/${resourceType}/upload`;
+  const formData = new FormData();
+  
+  let fileToUpload: string | Blob | File = fileOrDataUrl;
+  if (typeof fileOrDataUrl === 'string' && fileOrDataUrl.startsWith('data:')) {
+    try {
+      fileToUpload = dataURLtoBlob(fileOrDataUrl);
+    } catch (e) {
+      console.error("Failed to convert data URL to Blob", e);
+    }
+  }
+  
+  formData.append('file', fileToUpload);
+  formData.append('upload_preset', uploadPreset);
+  
+  try {
+    if (onProgress) onProgress(30);
+    const response = await fetch(url, {
+      method: 'POST',
+      body: formData
+    });
+    
+    if (!response.ok) {
+      const errText = await response.text();
+      throw new Error(`Upload failed with status ${response.status}: ${errText}`);
+    }
+    
+    const data = await response.json();
+    if (onProgress) onProgress(100);
+    return data.secure_url;
+  } catch (err: any) {
+    console.error("Cloudinary upload error:", err);
+    throw new Error(`${err.message}`);
+  }
+};
+
 
 function ProductEditorModal({ product, onClose, onSave }: { product?: Product | null, onClose: () => void, onSave: (p: Partial<Product>) => Promise<void> }) {
   const [formData, setFormData] = useState({

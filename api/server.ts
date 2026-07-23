@@ -1,2 +1,2 @@
-import app from '../express-app.js';
+import app from '../express-app';
 export default app;
