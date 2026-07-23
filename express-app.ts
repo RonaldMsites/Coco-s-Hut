@@ -1,6 +1,6 @@
 import express from 'express';
 import path from 'path';
-import { Product, Order, OrderStatus } from './src/types';
+import type { Product, Order, OrderStatus } from './src/types';
 
 // Initial Mock Data
 const initialProducts: Product[] = [
