@@ -358,7 +358,7 @@ export default function AdminDashboard() {
       }
     } catch (err: any) {
       console.error(err);
-      alert("Failed to save product. Ensure the files are not too large. Error: " + err.message);
+      alert("Failed to save product. Error: " + err.message);
     }
   };
 
